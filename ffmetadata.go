@@ -2,98 +2,132 @@ package audbk
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"log"
 	"os"
+	"strings"
 
+	"github.com/spf13/cast"
 	"gopkg.in/ini.v1"
 )
 
+type FFMetadata struct {
+	Name     string
+	Fields   map[string]string
+	Chapters map[string]any
+}
+
 const FFmetaHeader = ";FFMETADATA1\n"
 
-func Load(input string) (map[string]any, error) {
+var InvalidFFmetadata = errors.New("ffmetadata file is not valid")
+
+func LoadFFMeta(input string) (map[string]any, error) {
 	opts := ini.LoadOptions{}
 	opts.Insensitive = true
 	opts.InsensitiveSections = true
 	opts.IgnoreInlineComment = true
 	opts.AllowNonUniqueSections = true
 
-	//if !IsFFMeta(ffmeta.File) {
-	//  return ffmeta, fmt.Errorf("not an ffmetadata file")
-	//}
+	ffmeta := make(map[string]any)
+
+	if !IsValidFFMetadata(input) {
+		return ffmeta, InvalidFFmetadata
+	}
 
 	f, err := ini.LoadSources(opts, input)
 	if err != nil {
 		return ffmeta, err
 	}
 
-	meta := make(map[string]any)
-
 	for f, v := range f.Section("").KeysHash() {
-		meta[f] = v
+		ffmeta[f] = v
 	}
 
 	if f.HasSection("chapter") {
-		var chaps []map[string]string
+		var chaps []map[string]any
 		sections, err := f.SectionsByName("chapter")
 		if err != nil {
 			return ffmeta, err
 		}
 
 		for _, sec := range sections {
-			chaps = append(chaps, sec.KeysHash())
+			chap := make(map[string]any)
+			for _, k := range sec.KeyStrings() {
+				switch k {
+				case "timebase":
+					chap[k] = sec.Key(k).Value()
+				case "start", "end":
+					d, err := sec.Key(k).Int()
+					if err != nil {
+						d = 0
+					}
+					chap[k] = d
+				default:
+					chap[k] = sec.Key(k).Value()
+				}
+			}
+			chaps = append(chaps, chap)
 		}
 
-		meta["chapters"] = chaps
+		ffmeta["chapters"] = chaps
 	}
 
-	return meta, nil
+	return ffmeta, nil
 }
 
-//func Dump(meta avtools.Meta) []byte {
-//  ini.PrettyFormat = false
+func DumpFFMeta(meta map[string]any) ([]byte, error) {
+	if len(meta) < 1 {
+		return []byte{}, errors.New("no metadata")
+	}
+	ini.PrettyFormat = false
 
-//  opts := ini.LoadOptions{
-//    IgnoreInlineComment:    true,
-//    AllowNonUniqueSections: true,
-//  }
+	opts := ini.LoadOptions{
+		IgnoreInlineComment:    true,
+		AllowNonUniqueSections: true,
+	}
 
-//  ffmeta := ini.Empty(opts)
+	ffmeta := ini.Empty(opts)
 
-//  for k, v := range meta.Tags() {
-//    _, err := ffmeta.Section("").NewKey(k, v)
-//    if err != nil {
-//      log.Fatal(err)
-//    }
-//  }
+	for k, v := range meta {
+		if k != "chapters" {
+			_, err := ffmeta.Section("").NewKey(k, cast.ToString(v))
+			if err != nil {
+				return []byte{}, err
+			}
+		}
+		if k == "chapters" {
+			for _, chapter := range v.([]map[string]any) {
+				sec, err := ffmeta.NewSection("CHAPTER")
+				if err != nil {
+					return []byte{}, err
+				}
+				for ck, cv := range chapter {
+					if ck == "start" || ck == "end" || ck == "timebase" {
+						ck = strings.ToUpper(ck)
+					}
+					sec.NewKey(ck, cast.ToString(cv))
+				}
+			}
+		}
+	}
 
-//  for _, chapter := range meta.Chapters() {
-//    sec, err := ffmeta.NewSection("CHAPTER")
-//    if err != nil {
-//      log.Fatal(err)
-//    }
-//    sec.NewKey("TIMEBASE", "1/1000")
-//    ss := strconv.Itoa(int(chapter.StartStamp.Dur.Milliseconds()))
-//    sec.NewKey("START", ss)
+	var buf bytes.Buffer
 
-//    to := strconv.Itoa(int(chapter.EndStamp.Dur.Milliseconds()))
-//    sec.NewKey("END", to)
-//    sec.NewKey("title", chapter.ChapTitle)
-//    for k, v := range chapter.Tags {
-//      sec.NewKey(k, v)
-//    }
-//  }
+	_, err := buf.WriteString(FFmetaHeader)
+	if err != nil {
+		return []byte{}, err
+	}
 
-//  var buf bytes.Buffer
-//  _, err := buf.WriteString(FFmetaComment)
-//  _, err = ffmeta.WriteTo(&buf)
-//  if err != nil {
-//    log.Fatal(err)
-//  }
+	_, err = ffmeta.WriteTo(&buf)
+	if err != nil {
+		return []byte{}, err
+	}
 
-//  return buf.Bytes()
-//}
+	return buf.Bytes(), nil
+}
 
-func IsFFMeta(f string) bool {
+func IsValidFFMetadata(f string) bool {
 	contents, err := os.Open(f)
 	if err != nil {
 		log.Fatal(err)

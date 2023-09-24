@@ -2,4 +2,7 @@ module github.com/ohzqq/audbk
 
 go 1.20
 
-require gopkg.in/ini.v1 v1.67.0 // indirect
+require (
+	github.com/spf13/cast v1.5.1 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
+)
