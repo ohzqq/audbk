@@ -1,3 +1,3 @@
-module github.com/ohzqq/audiobk
+module github.com/ohzqq/audbk
 
 go 1.20
