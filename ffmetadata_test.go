@@ -23,13 +23,13 @@ func TestDumpFFmeta(t *testing.T) {
 	}
 }
 
-func loadFFmeta(t *testing.T) []map[string]any {
+func loadFFmeta(t *testing.T) []*FFMeta {
 	files, err := filepath.Glob("testdata/ffmeta*")
 	if err != nil {
 		t.Error(err)
 	}
 
-	var m []map[string]any
+	var m []*FFMeta
 	for _, file := range files {
 		meta, err := LoadFFMeta(file)
 		if err != nil && !errors.Is(err, InvalidFFmetadata) {
