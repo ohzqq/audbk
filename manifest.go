@@ -1,3 +1,5 @@
+//go:build exclude
+
 package audbk
 
 const (
@@ -11,14 +13,12 @@ const (
 	AccessibilitySummary = "accessibilitySummary"
 	AccessMode           = "accessMode"
 	AccessModeSufficient = "accessModeSufficient"
-	Author               = "author"
 	Cover                = "cover"
 	Duration             = "duration"
 	DateModified         = "dateModified"
 	DatePublished        = "datePublished"
 	ID                   = "id"
 	InLanguage           = "inLanguage"
-	ReadBy               = "readBy"
 	ReadingProgression   = "readingProgression"
 	Resources            = "resources"
 	URL                  = "url"

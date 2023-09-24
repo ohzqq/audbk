@@ -4,40 +4,35 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/spf13/cast"
 	"gopkg.in/ini.v1"
 )
 
-type FFMeta struct {
-	Name     string
-	Fields   map[string]string
-	Chapters []*Chapter
-}
-
 const FFmetaHeader = ";FFMETADATA1\n"
+
+const (
+	MediaArtist = "artist"
+	Composer    = "composer"
+	Album       = "album"
+	Date        = "date"
+	Genre       = "genre"
+	Comment     = "comment"
+)
 
 var InvalidFFmetadata = errors.New("ffmetadata file is not valid")
 
-func NewFFMeta(name string) *FFMeta {
-	return &FFMeta{
-		Name:   name,
-		Fields: make(map[string]string),
-	}
-}
-
-func LoadFFMeta(input string) (*FFMeta, error) {
+func LoadFFMeta(input string) (*Meta, error) {
 	opts := ini.LoadOptions{}
 	opts.Insensitive = true
 	opts.InsensitiveSections = true
 	opts.IgnoreInlineComment = true
 	opts.AllowNonUniqueSections = true
 
-	meta := make(map[string]any)
-	ffmeta := NewFFMeta(input)
+	ffmeta := NewMeta()
 
 	if !IsValidFFMetadata(input) {
 		return ffmeta, InvalidFFmetadata
@@ -49,34 +44,42 @@ func LoadFFMeta(input string) (*FFMeta, error) {
 	}
 
 	for f, v := range f.Section("").KeysHash() {
-		meta[f] = v
 		ffmeta.Fields[f] = v
 	}
 
 	if f.HasSection("chapter") {
+		var chaps []map[string]any
 		sections, err := f.SectionsByName("chapter")
 		if err != nil {
 			return ffmeta, err
 		}
 
 		for _, sec := range sections {
-			c := NewChapter()
-			sec.MapTo(&c)
+			chap := make(map[string]any)
 			for _, k := range sec.KeyStrings() {
 				switch k {
-				case "start", "end", "title", "timebase":
+				case "timebase":
+					chap[k] = sec.Key(k).Value()
+				case "start", "end":
+					d, err := sec.Key(k).Int()
+					if err != nil {
+						d = 0
+					}
+					chap[k] = d
 				default:
-					c.Fields[k] = sec.Key(k).Value()
+					chap[k] = sec.Key(k).Value()
 				}
 			}
-			ffmeta.Chapters = append(ffmeta.Chapters, c)
+			chaps = append(chaps, chap)
 		}
+
+		ffmeta.Fields["chapters"] = chaps
 	}
 
 	return ffmeta, nil
 }
 
-func DumpFFMeta(meta *FFMeta) ([]byte, error) {
+func DumpFFMeta(meta *Meta) ([]byte, error) {
 	if len(meta.Fields) < 1 {
 		return []byte{}, errors.New("no metadata")
 	}
@@ -90,32 +93,25 @@ func DumpFFMeta(meta *FFMeta) ([]byte, error) {
 	ffmeta := ini.Empty(opts)
 
 	for k, v := range meta.Fields {
-		_, err := ffmeta.Section("").NewKey(k, v)
-		if err != nil {
-			return []byte{}, err
+		if k != "chapters" {
+			_, err := ffmeta.Section("").NewKey(k, cast.ToString(v))
+			if err != nil {
+				return []byte{}, err
+			}
 		}
-	}
-
-	for _, ch := range meta.Chapters {
-		fmt.Printf("%#v\n", ch)
-		sec, err := ffmeta.NewSection("CHAPTER")
-		if err != nil {
-			return []byte{}, err
-		}
-		if ch.Timebase != "" {
-			sec.NewKey("TIMEBASE", ch.Timebase)
-		}
-		if ch.Start != 0 {
-			sec.NewKey("START", cast.ToString(ch.Start))
-		}
-		if ch.End != 0 {
-			sec.NewKey("END", cast.ToString(ch.End))
-		}
-		if ch.Title != "" {
-			sec.NewKey("title", ch.Title)
-		}
-		for k, v := range ch.Fields {
-			sec.NewKey(k, v)
+		if k == "chapters" {
+			for _, chapter := range v.([]map[string]any) {
+				sec, err := ffmeta.NewSection("CHAPTER")
+				if err != nil {
+					return []byte{}, err
+				}
+				for ck, cv := range chapter {
+					if ck == "start" || ck == "end" || ck == "timebase" {
+						ck = strings.ToUpper(ck)
+					}
+					sec.NewKey(ck, cast.ToString(cv))
+				}
+			}
 		}
 	}
 
