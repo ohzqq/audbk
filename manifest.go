@@ -1,5 +1,3 @@
-//go:build exclude
-
 package audbk
 
 const (
@@ -27,27 +25,27 @@ const (
 )
 
 type Manifest struct {
-	ConformsTo           string            `json:"conformsTo" mapstructure:"conformsTo"`
-	Context              string            `json:"@context" mapstructure:"context"`
-	ReadingOrder         []LinkedResource  `json:"readingOrder" mapstructure:"readingOrder"`
-	Name                 string            `json:"name" mapstructure:"name"`
-	Abridged             bool              `json:"abridged,omitempty" mapstructure:"abridged,omitempty"`
-	AccessibilityFeature []string          `json:"accessibilityFeature,omitempty" mapstructure:"accessibilityFeature,omitempty"`
-	AccessibilityHazard  []string          `json:"accessibilityHazard,omitempty" mapstructure:"accessibilityHazard,omitempty"`
-	AccessibilitySummary string            `json:"accessibilitySummary,omitempty" mapstructure:"accessibilitySummary,omitempty"`
-	AccessMode           []string          `json:"accessMode,omitempty" mapstructure:"accessMode,omitempty"`
-	AccessModeSufficient []any             `json:"accessModeSufficient,omitempty" mapstructure:"accessModeSufficient,omitempty"`
-	Author               []string          `json:"author,omitempty" mapstructure:"author,omitempty"`
-	Cover                LinkedResource    `json:"cover,omitempty" mapstructure:"cover,omitempty"`
-	Duration             string            `json:"duration,omitempty" mapstructure:"duration,omitempty"`
-	DateModified         string            `json:"dateModified,omitempty" mapstructure:"dateModified,omitempty"`
-	DatePublished        string            `json:"datePublished,omitempty" mapstructure:"datePublished,omitempty"`
-	ID                   string            `json:"id,omitempty" mapstructure:"id,omitempty"`
-	InLanguage           []string          `json:"inLanguage,omitempty" mapstructure:"inLanguage,omitempty"`
-	ReadBy               []string          `json:"readBy,omitempty" mapstructure:"readBy,omitempty"`
-	ReadingProgression   string            `json:"readingProgression,omitempty" mapstructure:"readingProgression,omitempty"`
-	Resources            []LinkedResources `json:"resources,omitempty" mapstructure:"resources,omitempty"`
-	URL                  string            `json:"url,omitempty" mapstructure:"url,omitempty"`
+	ConformsTo           string           `json:"conformsTo" mapstructure:"conformsTo"`
+	Context              string           `json:"@context" mapstructure:"context"`
+	ReadingOrder         []LinkedResource `json:"readingOrder" mapstructure:"readingOrder"`
+	Name                 string           `json:"name" mapstructure:"name"`
+	Abridged             bool             `json:"abridged,omitempty" mapstructure:"abridged,omitempty"`
+	AccessibilityFeature []string         `json:"accessibilityFeature,omitempty" mapstructure:"accessibilityFeature,omitempty"`
+	AccessibilityHazard  []string         `json:"accessibilityHazard,omitempty" mapstructure:"accessibilityHazard,omitempty"`
+	AccessibilitySummary string           `json:"accessibilitySummary,omitempty" mapstructure:"accessibilitySummary,omitempty"`
+	AccessMode           []string         `json:"accessMode,omitempty" mapstructure:"accessMode,omitempty"`
+	AccessModeSufficient []any            `json:"accessModeSufficient,omitempty" mapstructure:"accessModeSufficient,omitempty"`
+	Author               []string         `json:"author,omitempty" mapstructure:"author,omitempty"`
+	Cover                LinkedResource   `json:"cover,omitempty" mapstructure:"cover,omitempty"`
+	Duration             string           `json:"duration,omitempty" mapstructure:"duration,omitempty"`
+	DateModified         string           `json:"dateModified,omitempty" mapstructure:"dateModified,omitempty"`
+	DatePublished        string           `json:"datePublished,omitempty" mapstructure:"datePublished,omitempty"`
+	ID                   string           `json:"id,omitempty" mapstructure:"id,omitempty"`
+	InLanguage           []string         `json:"inLanguage,omitempty" mapstructure:"inLanguage,omitempty"`
+	ReadBy               []string         `json:"readBy,omitempty" mapstructure:"readBy,omitempty"`
+	ReadingProgression   string           `json:"readingProgression,omitempty" mapstructure:"readingProgression,omitempty"`
+	Resources            []LinkedResource `json:"resources,omitempty" mapstructure:"resources,omitempty"`
+	URL                  string           `json:"url,omitempty" mapstructure:"url,omitempty"`
 	AdditionalProperties map[string]string
 }
 
