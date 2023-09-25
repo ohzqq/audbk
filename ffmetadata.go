@@ -68,9 +68,19 @@ func (ff *FFMeta) ReadFile(input string) (*FFMeta, error) {
 }
 
 func (ff *FFMeta) WriteTo(w io.Writer) (int64, error) {
+	if ff.Title == "" {
+		return 0, nil
+	}
 	meta, err := FFMetaToIniFile(ff)
 	if err != nil {
 		return 0, err
+	}
+
+	head := []byte(FFMetaHeader)
+	head = append(head, '\n')
+	i, err := w.Write(head)
+	if err != nil {
+		return int64(i), err
 	}
 
 	return meta.WriteTo(w)
