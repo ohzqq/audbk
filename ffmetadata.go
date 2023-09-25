@@ -16,67 +16,91 @@ const FFmetaHeader = ";FFMETADATA1\n"
 
 const (
 	MediaArtist = "artist"
+	AlbumArtist = "album_artist"
 	Composer    = "composer"
 	Album       = "album"
 	Date        = "date"
 	Genre       = "genre"
 	Comment     = "comment"
+	Grouping    = "grouping"
+	Disc        = "disc"
 )
+
+type FFMeta struct {
+	Album       string          `mapstructure:"title,omitempty" ini:"album,omitempty"`
+	Title       string          `mapstructure:"title" ini:"title"`
+	Artist      string          `mapstructure:"authors,omitempty" ini:"artist,omitempty"`
+	AlbumArtist string          `mapstructure:"authors,omitempty" ini:"album_artist,omitempty"`
+	Composer    string          `mapstructure:"narrators,omitempty" ini:"composer,omitempty"`
+	Grouping    string          `mapstructure:"series,omitempty" ini:"grouping,omitempty"`
+	Disc        float64         `mapstructure:"series_index,omitempty" ini:"disc,omitempty"`
+	Genre       string          `mapstructure:"tags,omitempty" ini:"genre,omitempty"`
+	Date        string          `mapstructure:"pubdate,omitempty" ini:"date,omitempty"`
+	Comment     string          `mapstructure:"comments,omitempty" ini:"comment,omitempty"`
+	Other       map[string]any  `mapstructure:",remain" ini:"-"`
+	Chapters    []FFMetaChapter `mapstructure:"chapters,omitempty" ini:"-"`
+}
+
+type FFMetaChapter struct {
+	Timebase string         `ini:"TIMEBASE" mapstructure:"timebase,omitempty"`
+	Start    int            `ini:"START" mapstructure:"start,omitempty"`
+	End      int            `ini:"END" mapstructure:"end,omitempty"`
+	Title    string         `ini:"title,omitempty" mapstructure:"title,omitempty"`
+	Fields   map[string]any `mapstructure:",remain" ini:"-"`
+}
+
+func NewFFMeta() *FFMeta {
+	return &FFMeta{}
+}
+
+func NewChapter() *FFMetaChapter {
+	return &FFMetaChapter{
+		Fields: make(map[string]any),
+	}
+}
 
 var InvalidFFmetadata = errors.New("ffmetadata file is not valid")
 
-func LoadFFMeta(input string) (*Meta, error) {
+func LoadToStruct(input string) (FFMeta, error) {
 	opts := ini.LoadOptions{}
 	opts.Insensitive = true
 	opts.InsensitiveSections = true
 	opts.IgnoreInlineComment = true
 	opts.AllowNonUniqueSections = true
 
-	ffmeta := NewMeta()
+	var ff FFMeta
 
 	if !IsValidFFMetadata(input) {
-		return ffmeta, InvalidFFmetadata
+		return ff, InvalidFFmetadata
 	}
 
 	f, err := ini.LoadSources(opts, input)
 	if err != nil {
-		return ffmeta, err
+		return ff, err
 	}
 
-	for f, v := range f.Section("").KeysHash() {
-		ffmeta.Fields[f] = v
+	terr := f.MapTo(&ff)
+	if terr != nil {
+		log.Fatal(terr)
 	}
 
 	if f.HasSection("chapter") {
-		var chaps []map[string]any
 		sections, err := f.SectionsByName("chapter")
 		if err != nil {
-			return ffmeta, err
+			return ff, err
 		}
 
 		for _, sec := range sections {
-			chap := make(map[string]any)
-			for _, k := range sec.KeyStrings() {
-				switch k {
-				case "timebase":
-					chap[k] = sec.Key(k).Value()
-				case "start", "end":
-					d, err := sec.Key(k).Int()
-					if err != nil {
-						d = 0
-					}
-					chap[k] = d
-				default:
-					chap[k] = sec.Key(k).Value()
-				}
-			}
-			chaps = append(chaps, chap)
+			var ch FFMetaChapter
+			sec.MapTo(&ch)
+			ff.Chapters = append(ff.Chapters, ch)
 		}
-
-		ffmeta.Fields["chapters"] = chaps
 	}
+	return ff, nil
+}
 
-	return ffmeta, nil
+func audioFieldToBookField(k string) string {
+	return ""
 }
 
 func DumpFFMeta(meta *Meta) ([]byte, error) {
