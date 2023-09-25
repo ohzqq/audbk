@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -16,19 +15,6 @@ import (
 )
 
 const FFMetaHeader = ";FFMETADATA1"
-
-const (
-	MediaArtist = "artist"
-	AlbumArtist = "album_artist"
-	Composer    = "composer"
-	Album       = "album"
-	MediaTitle  = "title"
-	Date        = "date"
-	Genre       = "genre"
-	Comment     = "comment"
-	Grouping    = "grouping"
-	Disc        = "disc"
-)
 
 var InvalidFFmetadata = errors.New("ffmetadata file is not valid")
 
@@ -65,7 +51,7 @@ func NewChapter() *FFMetaChapter {
 	}
 }
 
-func (ff *FFMeta) LoadFile(input string) (*FFMeta, error) {
+func (ff *FFMeta) ReadFile(input string) (*FFMeta, error) {
 	data, err := OpenFFMeta(input)
 	if err != nil {
 		return ff, err
@@ -79,6 +65,51 @@ func (ff *FFMeta) LoadFile(input string) (*FFMeta, error) {
 	}
 
 	return ff, nil
+}
+
+func (ff *FFMeta) WriteTo(w io.Writer) (int64, error) {
+	meta, err := FFMetaToIniFile(ff)
+	if err != nil {
+		return 0, err
+	}
+
+	return meta.WriteTo(w)
+}
+
+func FFMetaToIniFile(ff *FFMeta) (*ini.File, error) {
+	ini.PrettyFormat = false
+
+	opts := ini.LoadOptions{
+		IgnoreInlineComment:    true,
+		AllowNonUniqueSections: true,
+	}
+
+	ffmeta := ini.Empty(opts)
+
+	if ff.Title == "" {
+		return ffmeta, nil
+	}
+
+	ffmeta.ReflectFrom(ff)
+
+	for _, chapter := range ff.Chapters {
+		sec, err := ffmeta.NewSection("CHAPTER")
+		if err != nil {
+			return ffmeta, err
+		}
+		if chapter.Timebase != "" {
+			sec.NewKey("TIMEBASE", chapter.Timebase)
+		}
+		sec.NewKey("START", cast.ToString(chapter.Start))
+		if chapter.End > 0 {
+			sec.NewKey("END", cast.ToString(chapter.End))
+		}
+		if chapter.Title != "" {
+			sec.NewKey("title", chapter.Title)
+		}
+	}
+
+	return ffmeta, nil
 }
 
 func FFMetaToBook(book *cdb.Book, ff *FFMeta) error {
@@ -107,18 +138,22 @@ func FFMetaToBook(book *cdb.Book, ff *FFMeta) error {
 	return nil
 }
 
-func BookToFFMeta(ff *FFMeta, book *cdb.Book) error {
-	meta := book.StringMap()
+func BookToFFMeta(ff *FFMeta, meta map[string]any) error {
+	var pub time.Time
+	if d, ok := meta[cdb.Pubdate]; ok {
+		pub = d.(time.Time)
+	}
 	delete(meta, cdb.Pubdate)
 
 	err := mapstructure.Decode(meta, ff)
 	if err != nil {
 		return err
 	}
-	ff.Date = book.Pubdate.Format(time.DateOnly)
+	ff.Date = pub.Format(time.DateOnly)
 
 	if ff.Grouping != "" {
-		ff.Grouping = ff.Grouping
+		idx := cast.ToString(ff.Disc)
+		ff.Grouping = ff.Grouping + ", Book " + idx
 	}
 
 	return nil
@@ -154,57 +189,6 @@ func LoadFFMeta(ff *FFMeta, rc io.Reader) error {
 		}
 	}
 	return nil
-}
-
-func DumpFFMeta(meta *Meta) ([]byte, error) {
-	if len(meta.Fields) < 1 {
-		return []byte{}, errors.New("no metadata")
-	}
-	ini.PrettyFormat = false
-
-	opts := ini.LoadOptions{
-		IgnoreInlineComment:    true,
-		AllowNonUniqueSections: true,
-	}
-
-	ffmeta := ini.Empty(opts)
-
-	for k, v := range meta.Fields {
-		if k != "chapters" {
-			_, err := ffmeta.Section("").NewKey(k, cast.ToString(v))
-			if err != nil {
-				return []byte{}, err
-			}
-		}
-		if k == "chapters" {
-			for _, chapter := range v.([]map[string]any) {
-				sec, err := ffmeta.NewSection("CHAPTER")
-				if err != nil {
-					return []byte{}, err
-				}
-				for ck, cv := range chapter {
-					if ck == "start" || ck == "end" || ck == "timebase" {
-						ck = strings.ToUpper(ck)
-					}
-					sec.NewKey(ck, cast.ToString(cv))
-				}
-			}
-		}
-	}
-
-	var buf bytes.Buffer
-
-	_, err := buf.WriteString(FFMetaHeader + "\n")
-	if err != nil {
-		return []byte{}, err
-	}
-
-	_, err = ffmeta.WriteTo(&buf)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return buf.Bytes(), nil
 }
 
 func IsValidFFMeta(b []byte) bool {

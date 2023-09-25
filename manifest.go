@@ -60,5 +60,29 @@ type LinkedResource struct {
 	Duration       string   `json:"duration,omitempty"`
 }
 
+type Creator struct {
+	Name   string
+	Entity *Entity
+}
+
+type Entity struct {
+	Type       []string
+	Name       []LocalizableString
+	ID         string
+	URL        string
+	Identifier []string
+}
+
+type LocalizableString struct {
+	Monolingual  string
+	Multilingual MultilingualString
+}
+
+type MultilingualString struct {
+	Value     string
+	Language  string
+	Direction string
+}
+
 //func (m Manifest) MarshalJSON() ([]byte, error) {
 //}

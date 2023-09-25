@@ -3,6 +3,7 @@ package audbk
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -24,9 +25,13 @@ func TestDumpFFmeta(t *testing.T) {
 	for _, m := range meta {
 		book := cdb.Book{}
 		FFMetaToBook(&book, m)
-		//fmt.Printf("%#v\n", book)
 		ff := NewFFMeta()
-		err := BookToFFMeta(ff, &book)
+		err := BookToFFMeta(ff, book.StringMap())
+		if err != nil {
+			t.Error(err)
+		}
+
+		_, err = m.WriteTo(os.Stdout)
 		if err != nil {
 			t.Error(err)
 		}
@@ -42,7 +47,7 @@ func reloadFFmeta(t *testing.T) []*FFMeta {
 	var m []*FFMeta
 	for _, file := range files {
 		ff := NewFFMeta()
-		meta, err := ff.LoadFile(file)
+		meta, err := ff.ReadFile(file)
 		if err != nil && !errors.Is(err, InvalidFFmetadata) {
 			t.Error(err)
 		}
