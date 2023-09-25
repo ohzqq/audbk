@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -16,7 +15,7 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-const FFmetaHeader = ";FFMETADATA1"
+const FFMetaHeader = ";FFMETADATA1"
 
 const (
 	MediaArtist = "artist"
@@ -67,18 +66,19 @@ func NewChapter() *FFMetaChapter {
 }
 
 func (ff *FFMeta) LoadFile(input string) (*FFMeta, error) {
-	data, err := os.ReadFile(input)
+	data, err := OpenFFMeta(input)
 	if err != nil {
 		return ff, err
 	}
 
-	if !IsValidFFMetadata(data) {
-		return ff, InvalidFFmetadata
-	}
-
 	file := io.NopCloser(bytes.NewReader(data))
 
-	return LoadFFMeta(ff, file)
+	err = LoadFFMeta(ff, file)
+	if err != nil {
+		return ff, err
+	}
+
+	return ff, nil
 }
 
 func FFMetaToBook(book *cdb.Book, ff *FFMeta) error {
@@ -124,7 +124,7 @@ func BookToFFMeta(ff *FFMeta, book *cdb.Book) error {
 	return nil
 }
 
-func LoadFFMeta(ff *FFMeta, rc io.ReadCloser) (*FFMeta, error) {
+func LoadFFMeta(ff *FFMeta, rc io.Reader) error {
 	opts := ini.LoadOptions{}
 	opts.Insensitive = true
 	opts.InsensitiveSections = true
@@ -133,18 +133,18 @@ func LoadFFMeta(ff *FFMeta, rc io.ReadCloser) (*FFMeta, error) {
 
 	f, err := ini.LoadSources(opts, rc)
 	if err != nil {
-		return ff, err
+		return err
 	}
 
 	terr := f.MapTo(ff)
 	if terr != nil {
-		log.Fatal(terr)
+		return terr
 	}
 
 	if f.HasSection("chapter") {
 		sections, err := f.SectionsByName("chapter")
 		if err != nil {
-			return ff, err
+			return err
 		}
 
 		for _, sec := range sections {
@@ -153,7 +153,7 @@ func LoadFFMeta(ff *FFMeta, rc io.ReadCloser) (*FFMeta, error) {
 			ff.Chapters = append(ff.Chapters, ch)
 		}
 	}
-	return ff, nil
+	return nil
 }
 
 func DumpFFMeta(meta *Meta) ([]byte, error) {
@@ -194,7 +194,7 @@ func DumpFFMeta(meta *Meta) ([]byte, error) {
 
 	var buf bytes.Buffer
 
-	_, err := buf.WriteString(FFmetaHeader + "\n")
+	_, err := buf.WriteString(FFMetaHeader + "\n")
 	if err != nil {
 		return []byte{}, err
 	}
@@ -207,9 +207,33 @@ func DumpFFMeta(meta *Meta) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func IsValidFFMetadata(b []byte) bool {
-	head := []byte(FFmetaHeader)
+func IsValidFFMeta(b []byte) bool {
+	head := []byte(FFMetaHeader)
 	return bytes.Equal(head, b[:len(head)])
+}
+
+func OpenFFMeta(f string) ([]byte, error) {
+	file, err := os.Open(f)
+	if err != nil {
+		return []byte{}, err
+	}
+	defer file.Close()
+
+	return ReadFFMeta(file)
+}
+
+func ReadFFMeta(r io.Reader) ([]byte, error) {
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return b, err
+	}
+
+	head := []byte(FFMetaHeader)
+	if !bytes.Equal(head, b[:len(head)]) {
+		return b, InvalidFFmetadata
+	}
+
+	return b, nil
 }
 
 var groupRegexp = regexp.MustCompile(`(?P<series>.*), [b|B]ook (?P<index>.*)`)
