@@ -1,24 +1,29 @@
 package audbk
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
+	"io"
 	"log"
 	"os"
+	"regexp"
 	"strings"
+	"time"
 
+	"github.com/mitchellh/mapstructure"
+	"github.com/ohzqq/cdb"
 	"github.com/spf13/cast"
 	"gopkg.in/ini.v1"
 )
 
-const FFmetaHeader = ";FFMETADATA1\n"
+const FFmetaHeader = ";FFMETADATA1"
 
 const (
 	MediaArtist = "artist"
 	AlbumArtist = "album_artist"
 	Composer    = "composer"
 	Album       = "album"
+	MediaTitle  = "title"
 	Date        = "date"
 	Genre       = "genre"
 	Comment     = "comment"
@@ -26,15 +31,17 @@ const (
 	Disc        = "disc"
 )
 
+var InvalidFFmetadata = errors.New("ffmetadata file is not valid")
+
 type FFMeta struct {
-	Album       string          `mapstructure:"title,omitempty" ini:"album,omitempty"`
 	Title       string          `mapstructure:"title" ini:"title"`
-	Artist      string          `mapstructure:"authors,omitempty" ini:"artist,omitempty"`
-	AlbumArtist string          `mapstructure:"authors,omitempty" ini:"album_artist,omitempty"`
-	Composer    string          `mapstructure:"narrators,omitempty" ini:"composer,omitempty"`
+	Album       string          `mapstructure:"title,omitempty" ini:"album,omitempty"`
+	Artist      []string        `mapstructure:"authors,omitempty" ini:"artist,omitempty"`
+	AlbumArtist []string        `mapstructure:"authors,omitempty" ini:"album_artist,omitempty"`
+	Composer    []string        `mapstructure:"narrators,omitempty" ini:"composer,omitempty"`
 	Grouping    string          `mapstructure:"series,omitempty" ini:"grouping,omitempty"`
 	Disc        float64         `mapstructure:"series_index,omitempty" ini:"disc,omitempty"`
-	Genre       string          `mapstructure:"tags,omitempty" ini:"genre,omitempty"`
+	Genre       []string        `mapstructure:"tags,omitempty" ini:"genre,omitempty"`
 	Date        string          `mapstructure:"pubdate,omitempty" ini:"date,omitempty"`
 	Comment     string          `mapstructure:"comments,omitempty" ini:"comment,omitempty"`
 	Other       map[string]any  `mapstructure:",remain" ini:"-"`
@@ -59,27 +66,77 @@ func NewChapter() *FFMetaChapter {
 	}
 }
 
-var InvalidFFmetadata = errors.New("ffmetadata file is not valid")
+func (ff *FFMeta) LoadFile(input string) (*FFMeta, error) {
+	data, err := os.ReadFile(input)
+	if err != nil {
+		return ff, err
+	}
 
-func LoadToStruct(input string) (FFMeta, error) {
+	if !IsValidFFMetadata(data) {
+		return ff, InvalidFFmetadata
+	}
+
+	file := io.NopCloser(bytes.NewReader(data))
+
+	return LoadFFMeta(ff, file)
+}
+
+func FFMetaToBook(book *cdb.Book, ff *FFMeta) error {
+	if ff.Date != "" {
+		t, err := time.Parse(time.DateOnly, ff.Date)
+		if err != nil {
+			t = time.Now()
+		}
+		book.Pubdate = t
+	}
+
+	book.Authors = ff.Artist
+	book.Authors = ff.AlbumArtist
+	book.Narrators = ff.Composer
+	book.Tags = ff.Genre
+	s, i := parseGrouping(ff.Grouping)
+	book.Series = s
+	book.SeriesIndex = ff.Disc
+	if ff.Disc != i {
+		book.SeriesIndex = i
+	}
+	book.Comments = ff.Comment
+	book.Title = ff.Title
+	book.Title = ff.Album
+
+	return nil
+}
+
+func BookToFFMeta(ff *FFMeta, book *cdb.Book) error {
+	meta := book.StringMap()
+	delete(meta, cdb.Pubdate)
+
+	err := mapstructure.Decode(meta, ff)
+	if err != nil {
+		return err
+	}
+	ff.Date = book.Pubdate.Format(time.DateOnly)
+
+	if ff.Grouping != "" {
+		ff.Grouping = ff.Grouping
+	}
+
+	return nil
+}
+
+func LoadFFMeta(ff *FFMeta, rc io.ReadCloser) (*FFMeta, error) {
 	opts := ini.LoadOptions{}
 	opts.Insensitive = true
 	opts.InsensitiveSections = true
 	opts.IgnoreInlineComment = true
 	opts.AllowNonUniqueSections = true
 
-	var ff FFMeta
-
-	if !IsValidFFMetadata(input) {
-		return ff, InvalidFFmetadata
-	}
-
-	f, err := ini.LoadSources(opts, input)
+	f, err := ini.LoadSources(opts, rc)
 	if err != nil {
 		return ff, err
 	}
 
-	terr := f.MapTo(&ff)
+	terr := f.MapTo(ff)
 	if terr != nil {
 		log.Fatal(terr)
 	}
@@ -97,10 +154,6 @@ func LoadToStruct(input string) (FFMeta, error) {
 		}
 	}
 	return ff, nil
-}
-
-func audioFieldToBookField(k string) string {
-	return ""
 }
 
 func DumpFFMeta(meta *Meta) ([]byte, error) {
@@ -141,7 +194,7 @@ func DumpFFMeta(meta *Meta) ([]byte, error) {
 
 	var buf bytes.Buffer
 
-	_, err := buf.WriteString(FFmetaHeader)
+	_, err := buf.WriteString(FFmetaHeader + "\n")
 	if err != nil {
 		return []byte{}, err
 	}
@@ -154,20 +207,32 @@ func DumpFFMeta(meta *Meta) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func IsValidFFMetadata(f string) bool {
-	contents, err := os.Open(f)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer contents.Close()
+func IsValidFFMetadata(b []byte) bool {
+	head := []byte(FFmetaHeader)
+	return bytes.Equal(head, b[:len(head)])
+}
 
-	scanner := bufio.NewScanner(contents)
-	line := 0
-	for scanner.Scan() {
-		if line == 0 && scanner.Text() == ";FFMETADATA1" {
-			return true
-			break
-		}
+var groupRegexp = regexp.MustCompile(`(?P<series>.*), [b|B]ook (?P<index>.*)`)
+
+func parseGrouping(g string) (string, float64) {
+	matches := groupRegexp.FindStringSubmatch(g)
+	s := groupRegexp.SubexpIndex("series")
+	si := groupRegexp.SubexpIndex("index")
+
+	if len(matches) < 1 {
+		return g, 0
 	}
-	return false
+
+	series := matches[s]
+
+	seriesIdx := matches[si]
+	if seriesIdx != "" {
+		f, err := cast.ToFloat64E(seriesIdx)
+		if err != nil {
+			return series, 0
+		}
+		return series, f
+	}
+
+	return series, 0
 }

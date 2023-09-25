@@ -3,11 +3,10 @@ package audbk
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 
-	"gopkg.in/ini.v1"
+	"github.com/ohzqq/cdb"
 )
 
 var testFFmetaWithChaps = `testdata/ffmeta-with-chap.ini`
@@ -15,68 +14,57 @@ var testFFmetaWithChaps = `testdata/ffmeta-with-chap.ini`
 func TestLoadFFmeta(t *testing.T) {
 	meta := reloadFFmeta(t)
 	for _, m := range meta {
-		//var ff FFMeta
-		//mapstructure.Decode(m.Fields, &ff)
 		fmt.Printf("test load %#v\n", m)
 	}
 }
 
 func TestDumpFFmeta(t *testing.T) {
+	println("TestDumpFFmeta")
 	meta := reloadFFmeta(t)
 	for _, m := range meta {
-		ini.PrettyFormat = false
-
-		opts := ini.LoadOptions{
-			IgnoreInlineComment:    true,
-			AllowNonUniqueSections: true,
-		}
-
-		ffmeta := ini.Empty(opts)
-		err := ini.ReflectFrom(ffmeta, &m)
-
-		for _, chapter := range m.Chapters {
-			sec, err := ffmeta.NewSection("CHAPTER")
-			if err != nil {
-				//return []byte{}, err
-				t.Error(err)
-			}
-			sec.ReflectFrom(&chapter)
-			//for ck, cv := range chapter {
-			//  if ck == "start" || ck == "end" || ck == "timebase" {
-			//    ck = strings.ToUpper(ck)
-			//  }
-			//  sec.NewKey(ck, cast.ToString(cv))
-			//}
-
-		}
-
-		//d, err := DumpFFMeta(m)
-		if err != nil {
-			t.Error(err)
-		}
-		//println(string(d))
-
-		//fmt.Printf("%#v\n", ff)
-		_, err = ffmeta.WriteTo(os.Stdout)
+		book := cdb.Book{}
+		FFMetaToBook(&book, m)
+		//fmt.Printf("%#v\n", book)
+		ff := NewFFMeta()
+		err := BookToFFMeta(ff, &book)
 		if err != nil {
 			t.Error(err)
 		}
 	}
 }
 
-func reloadFFmeta(t *testing.T) []FFMeta {
+func reloadFFmeta(t *testing.T) []*FFMeta {
 	files, err := filepath.Glob("testdata/ffmeta*")
 	if err != nil {
 		t.Error(err)
 	}
 
-	var m []FFMeta
+	var m []*FFMeta
 	for _, file := range files {
-		meta, err := LoadToStruct(file)
+		ff := NewFFMeta()
+		meta, err := ff.LoadFile(file)
 		if err != nil && !errors.Is(err, InvalidFFmetadata) {
 			t.Error(err)
 		}
 		m = append(m, meta)
 	}
 	return m
+}
+
+func TestParseGrouping(t *testing.T) {
+	testStr := []string{
+		"Series Title, book 2",
+		"Series Title, Book 2",
+		"Series Title",
+	}
+
+	for _, str := range testStr {
+		s, i := parseGrouping(str)
+		if s != "Series Title" {
+			t.Errorf("expected 'Series Title' got %s\n", s)
+		}
+		if i != 2 && i != 0 {
+			t.Errorf("expected 2 or 0 got %f\n", i)
+		}
+	}
 }
