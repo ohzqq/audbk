@@ -19,6 +19,14 @@ func TestLoadFFmeta(t *testing.T) {
 	}
 }
 
+func TestDecode(t *testing.T) {
+	var book cdb.Book
+	s := cdb.NewSerializer(&book).Decoder(DecodeINI)
+	s.ReadFile("testdata/ffmeta-with-chap.ini")
+	fmt.Printf("%#v\n", book)
+	//ff.Decode(book)
+}
+
 func TestDumpFFmeta(t *testing.T) {
 	println("TestDumpFFmeta")
 	meta := reloadFFmeta(t)

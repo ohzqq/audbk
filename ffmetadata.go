@@ -18,7 +18,13 @@ const FFMetaHeader = ";FFMETADATA1"
 
 var InvalidFFmetadata = errors.New("ffmetadata file is not valid")
 
+type FFMetaDecoder struct {
+	ini    *ini.File
+	reader io.Reader
+}
+
 type FFMeta struct {
+	ini         *ini.File
 	Title       string          `mapstructure:"title" ini:"title"`
 	Album       string          `mapstructure:"title,omitempty" ini:"album,omitempty"`
 	Artist      []string        `mapstructure:"authors,omitempty" ini:"artist,omitempty"`
@@ -42,7 +48,27 @@ type FFMetaChapter struct {
 }
 
 func NewFFMeta() *FFMeta {
-	return &FFMeta{}
+	ini.PrettyFormat = false
+
+	opts := ini.LoadOptions{
+		IgnoreInlineComment:    true,
+		AllowNonUniqueSections: true,
+	}
+
+	return &FFMeta{
+		ini: ini.Empty(opts),
+	}
+}
+
+func DecodeINI(s *cdb.Serializer) cdb.BookDecoder {
+	s.Format = ".ini"
+	return func(r io.Reader) cdb.Decoder {
+		ff := NewFFMeta()
+		//if err != nil {
+		//  return err
+		//}
+		return ff
+	}
 }
 
 func NewChapter() *FFMetaChapter {
@@ -67,6 +93,23 @@ func (ff *FFMeta) ReadFile(input string) (*FFMeta, error) {
 	return ff, nil
 }
 
+func (ff *FFMeta) Decode(v any) error {
+	//meta := make(map[string]any)
+	//switch m := v.(type) {
+	//case map[string]any:
+	//meta = m
+	//case cdb.Book:
+	//meta = m.StringMap()
+	//}
+	//mapstructure.Decode(v, &meta)
+	//BookToFFMeta(ff, meta)
+	if b, ok := v.(*cdb.Book); ok {
+		println("poot")
+		FFMetaToBook(b, ff)
+	}
+	return nil
+}
+
 func (ff *FFMeta) WriteTo(w io.Writer) (int64, error) {
 	if ff.Title == "" {
 		return 0, nil
@@ -75,6 +118,7 @@ func (ff *FFMeta) WriteTo(w io.Writer) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	ff.ini = meta
 
 	head := []byte(FFMetaHeader)
 	head = append(head, '\n')
@@ -198,6 +242,8 @@ func LoadFFMeta(ff *FFMeta, rc io.Reader) error {
 			ff.Chapters = append(ff.Chapters, ch)
 		}
 	}
+
+	ff.ini = f
 	return nil
 }
 

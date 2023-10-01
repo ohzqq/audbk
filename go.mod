@@ -10,7 +10,7 @@ require (
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.17 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/ohzqq/cdb v0.0.97 // indirect
+	github.com/ohzqq/cdb v0.0.99 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
 	github.com/spf13/cobra v1.7.0 // indirect

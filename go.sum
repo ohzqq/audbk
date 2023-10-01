@@ -20,6 +20,10 @@ github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyua
 github.com/mitchellh/mapstructure v1.5.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/ohzqq/cdb v0.0.97 h1:u58PkYGESi30sPSnX8ibnhxkOYheHPpA8QqyYdC+WyE=
 github.com/ohzqq/cdb v0.0.97/go.mod h1:cAtk+HoGR+fggBgBfevnnbpOeNGKJkM1aBKHDMNMz/c=
+github.com/ohzqq/cdb v0.0.98 h1:AEfau5vOEy+hdv7T4nL23YZNlqHHZ+hht89D6N5TEgM=
+github.com/ohzqq/cdb v0.0.98/go.mod h1:cAtk+HoGR+fggBgBfevnnbpOeNGKJkM1aBKHDMNMz/c=
+github.com/ohzqq/cdb v0.0.99 h1:6GYq6S+nA7DhH6fCic1l/7muHCOekEwyE3KCejBrHe0=
+github.com/ohzqq/cdb v0.0.99/go.mod h1:cAtk+HoGR+fggBgBfevnnbpOeNGKJkM1aBKHDMNMz/c=
 github.com/pelletier/go-toml/v2 v2.1.0 h1:FnwAJ4oYMvbT/34k9zzHuZNrhlz48GB3/s6at6/MHO4=
 github.com/pelletier/go-toml/v2 v2.1.0/go.mod h1:tJU2Z3ZkXwnxa4DPO899bsyIoywizdUvyaeZurnPPDc=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
